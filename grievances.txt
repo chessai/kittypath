@@ -1,0 +1,35 @@
+some problems with current path-related libraries in haskell:
+
+`filepath`
+1. just a functions that act on string - this has some obvious downsides that things like `path` try to fix
+
+`system-filepath`
+1. better than `filepath`, but somehow deprecated in favour of `filepath`. i feel like it was on the right track.
+
+`path`
+n.b.: `path` is currently the best path-related library on hackage, but it falls short in some respects:
+
+1. doesn't use datakinds, when it should
+2. composition is too restricted/not expressive enough (i will expand on this further down)
+3. path uses template haskell for no good reason
+4. use of MonadThrow
+
+in this encoding, a Path is parameterised by two phantom type variables - and at the value-level just contains a ByteString that contains the actual filepath.
+
+in particular, there is a DataKind, currently called 'RFF', which is either 'Root', 'Folder', or 'File'.
+
+data RFF = Root | Folder | File
+
+a Path can be one of the following:
+
+Path Root   Folder -- absolute path to a folder
+Path Root   File   -- absolute path to a file
+Path Folder Folder -- relative path to a folder
+Path Folder File   -- relative path to a file
+
+newtype Path (s :: RFF) (t :: RFF) = Path { mkPath :: ByteString }
+
+type role Path phantom phantom
+
+This encoding has some nice properties related to composition.
+For example, when composing p1@(Path a b) and p2@(Path b c), we get some interesting facts about how the resulting path should look for free. We know that 'b' can only be 'Folder', since 'Folder' is the only thing that can appear on both the left and right of 'Path', which means that we automatically know to shave off a path character ("/" or "\") from the end of p1!
